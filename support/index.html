@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordo — Support</title>
+<style>
+:root{--paper:#F7F2E9;--ink:#1D1814;--ink2:#6E6458;--card:#FFFCF6;--border:#E8DFD1;--social:#2F5FD0}
+@media (prefers-color-scheme:dark){:root{--paper:#171310;--ink:#F2EBDD;--ink2:#A89C8C;--card:#231D18;--border:#3A322B;--social:#8FA9F5}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--paper);color:var(--ink);
+  font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro","Segoe UI",system-ui,sans-serif;padding:24px}
+.card{max-width:420px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:36px 32px;text-align:left}
+.mark{display:flex;flex-direction:column;gap:5px;margin-bottom:18px}
+.mark span{display:block;height:3px;border-radius:2px;background:var(--ink)}
+.mark span:nth-child(1){width:44px}.mark span:nth-child(2){width:32px}.mark span:nth-child(3){width:21px}.mark span:nth-child(4){width:11px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.18em;color:var(--ink2);margin:0 0 8px}
+h1{font-size:30px;font-weight:800;letter-spacing:-.02em;margin:0 0 10px}
+p{margin:0 0 14px;color:var(--ink2);line-height:1.55;font-size:15px}
+.email{display:inline-block;font-weight:700;font-size:17px;color:var(--social);text-decoration:none;
+  padding:12px 18px;border:1px solid var(--border);border-radius:999px;background:var(--paper)}
+.email:hover{border-color:var(--social)}
+.foot{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);font-size:12px;color:var(--ink2)}
+.foot a{color:var(--ink2)}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+  <p class="eyebrow">ORDO · SUPPORT</p>
+  <h1>Need a hand?</h1>
+  <p>Questions, bug reports, feedback, or account help — email us and a human (the human, honestly) will get back to you, usually within a day or two.</p>
+  <a class="email" href="mailto:bnlee419@gmail.com?subject=Ordo%20support">bnlee419@gmail.com</a>
+  <p class="foot">Ordo — the daily ranking game you play with your friends.<br>
+  <a href="../privacy/">Privacy policy</a> · © 2026 Brian Lee</p>
+</main>
+</body>
+</html>
