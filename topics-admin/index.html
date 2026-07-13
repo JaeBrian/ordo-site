@@ -246,6 +246,8 @@ function relTime(iso) {
 }
 
 function submitterLabel(r) {
+  // 0042: web pitches carry a self-given name — show it first.
+  if (r.submitter_name) return esc(r.submitter_name) + " (web)";
   const name = r.submitter && r.submitter.username;
   if (name) return "@" + esc(name);
   // profiles RLS is group-scoped → the join is null for this admin user;
