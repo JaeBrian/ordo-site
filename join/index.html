@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordo — You're invited</title>
+<!--
+  ORDO · JOIN-BY-LINK FALLBACK  (pairs with the app's universal link)
+  Installed phones never see this page — iOS matches /ordo-site/join/* against
+  the AASA at https://jaebrian.github.io/.well-known/apple-app-site-association
+  and opens the app, which auto-joins ?c=CODE. Everyone else lands here:
+  the code huge and copyable, one App Store button, and the have-the-app hint.
+  Static only (GitHub Pages) — the code stays in the query, no server needed.
+-->
+<style>
+:root{
+  --ground:#17130F; --card:#211B15; --card2:#2A231B; --border:#3A322B;
+  --cream:#F2EBDD; --ink2:#A89C8C; --ink3:#6E6458;
+  --social:#8FA9F5; --good:#8FBF97; --chili:#E0785C;
+}
+*{box-sizing:border-box}
+html{background:var(--ground)}
+body{
+  margin:0; min-height:100vh; background:var(--ground); color:var(--cream);
+  font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro","Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; padding:0 20px 80px;
+}
+.wrap{max-width:560px; margin:0 auto}
+header{padding:44px 0 0}
+.mark{display:flex; flex-direction:column; gap:5px; margin-bottom:18px}
+.mark span{display:block; height:3px; border-radius:2px; background:var(--cream)}
+.mark span:nth-child(1){width:44px}.mark span:nth-child(2){width:32px}
+.mark span:nth-child(3){width:21px}.mark span:nth-child(4){width:11px}
+.eyebrow{font-size:11px; font-weight:700; letter-spacing:.18em; color:var(--ink2);
+  text-transform:uppercase; margin:0 0 8px}
+h1{font-size:34px; font-weight:800; letter-spacing:-.02em; margin:0 0 8px}
+.sub{margin:0; color:var(--ink2); line-height:1.55; font-size:15px}
+.rule{height:1px; background:var(--border); border:0; margin:26px 0}
+
+.shelf{
+  background:var(--card); border:1px solid var(--border); border-radius:18px;
+  padding:22px; margin:0 0 18px; display:none;
+}
+.shelf.show{display:block}
+.shelf label{display:block; font-size:11px; font-weight:700; letter-spacing:.16em;
+  color:var(--ink2); text-transform:uppercase; margin:0 0 10px}
+.coderow{display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.code{
+  font-size:44px; font-weight:800; letter-spacing:.18em; line-height:1;
+  color:var(--cream); user-select:all; -webkit-user-select:all;
+}
+.copy{
+  background:var(--card2); color:var(--cream); border:1px solid var(--border);
+  border-radius:999px; padding:10px 18px; font:inherit; font-size:14px;
+  font-weight:700; cursor:pointer; white-space:nowrap;
+}
+.copy:hover{border-color:var(--ink2)}
+.copy.done{color:var(--good); border-color:var(--good)}
+
+.store{
+  display:block; text-align:center; text-decoration:none;
+  background:var(--cream); color:#17130F; border-radius:999px; padding:15px;
+  font-size:16px; font-weight:800; letter-spacing:-.01em; margin:0 0 16px;
+}
+.hint{margin:0; color:var(--ink2); font-size:14px; line-height:1.6}
+.hint a{color:var(--social); font-weight:700; text-decoration:none}
+.hint a:hover{text-decoration:underline}
+.hint b{color:var(--cream); font-weight:700}
+
+footer{margin-top:44px; font-size:12.5px; color:var(--ink3); line-height:1.6}
+footer a{color:var(--ink3)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <p class="eyebrow">Ordo · Group invite</p>
+    <h1>You're invited.</h1>
+    <p class="sub" id="sub">A friend wants you in their Ordo group — one topic a day,
+    everyone ranks it, then you argue about the results.</p>
+    <hr class="rule">
+  </header>
+
+  <div class="shelf" id="shelf">
+    <label for="code">Your invite code</label>
+    <div class="coderow">
+      <div class="code" id="code"></div>
+      <button type="button" class="copy" id="copy">Copy code</button>
+    </div>
+  </div>
+
+  <a class="store" href="https://apps.apple.com/app/id6788900757">Get Ordo on the App Store</a>
+
+  <p class="hint" id="hint">Have the app?
+    <a id="open" href="#">Open Ordo</a> → <b>Groups</b> → <b>Join with code</b>.</p>
+
+  <footer>
+    Ordo — the daily ranking game you play with your friends.
+    <a href="https://apps.apple.com/app/id6788900757">Get the app</a>
+  </footer>
+</div>
+
+<script>
+// The code rides the query (?c=CODE) because this site is static; validate
+// against gen_invite_code's shape — 6 chars, unambiguous alphabet (no I/L/O/0/1).
+const raw = (new URLSearchParams(location.search).get("c") || "").trim().toUpperCase();
+const valid = /^[A-HJKMNP-Z2-9]{6}$/.test(raw);
+
+const shelf = document.getElementById("shelf");
+const openLink = document.getElementById("open");
+if (valid) {
+  document.getElementById("code").textContent = raw;
+  shelf.classList.add("show");
+  // Installed-but-landed-here (e.g. long-pressed the link): the custom scheme
+  // still one-taps the join.
+  openLink.href = "ordo://join/" + raw;
+} else {
+  // No (or mangled) code: still a warm landing, just nothing to copy.
+  document.getElementById("sub").textContent =
+    "Ordo is a daily ranking game you play with your friends — one topic a day, " +
+    "everyone ranks it, then you argue about the results. Ask your friend for " +
+    "their 6-character invite code.";
+  openLink.replaceWith(Object.assign(document.createElement("b"), { textContent: "Open Ordo" }));
+}
+
+const copy = document.getElementById("copy");
+copy.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(raw);
+  } catch (e) {
+    // Older WebViews: select-all fallback — the code element is user-select:all.
+    const range = document.createRange();
+    range.selectNodeContents(document.getElementById("code"));
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    document.execCommand("copy");
+  }
+  copy.textContent = "Copied";
+  copy.classList.add("done");
+  setTimeout(() => { copy.textContent = "Copy code"; copy.classList.remove("done"); }, 1600);
+});
+</script>
+</body>
+</html>
