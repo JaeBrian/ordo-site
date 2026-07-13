@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Ordo — Topic queue</title>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  ORDO · TOPIC SUBMISSIONS ADMIN QUEUE  (pairs with migration 0041)
+
+  A single static file — no build step. Copy this folder to the ordo-site
+  GitHub Pages repo (e.g. ordo-site/topics-admin/index.html →
+  https://jaebrian.github.io/ordo-site/topics-admin/).
+
+  DEPLOY STEPS — Supabase Auth settings (dashboard, project lhgrjflugaipqloofkfn),
+  do these BEFORE the page can sign anyone in:
+
+    1. Auth → Providers → Email: ENABLED, with magic links allowed
+       ("Enable Email provider"; signups must be allowed for the first
+       sign-in, since the admin's web user is created by the magic link).
+    2. Auth → URL Configuration → Redirect URLs: add the EXACT Pages URL,
+       e.g.  https://jaebrian.github.io/ordo-site/topics-admin/
+       (the magic link bounces back here; an unlisted URL is rejected).
+    3. Apply migration 0041 (topic_submissions + submit_topic + the
+       email-keyed admin policies).
+
+  SECURITY MODEL — safe to host in the open:
+    * The anon key below is the PUBLIC client key (same one baked into the
+      iOS app) — safe to embed by design. All authority lives in RLS.
+    * Sign-in is a Supabase email magic link. Admin-ness is the JWT email
+      claim: RLS policies (0041) allow SELECT-all/UPDATE(status, reviewed_at)
+      only when auth.jwt()->>'email' = 'bnlee419@gmail.com'. Anyone else who
+      signs in sees an empty queue and can change nothing.
+    * The UPDATE grant is column-scoped server-side — this page (or a
+      hijacked session) can only ever flip status/reviewed_at, never rewrite
+      a player's words.
+
+  KNOWN LIMITATION — submitter usernames: the profiles SELECT policy is
+  group-scoped (shares_group_with), and the admin's web user shares a group
+  with nobody — so the profiles(username) join returns null for virtually
+  every row. Rows fall back to a short hash of submitter_id (enough to spot
+  repeat submitters). Fixing it properly would mean widening profiles RLS or
+  snapshotting the username at submit time — deliberately NOT done in 0041.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<style>
+:root{
+  --ground:#17130F; --card:#211B15; --card2:#2A231B; --border:#3A322B;
+  --cream:#F2EBDD; --ink2:#A89C8C; --ink3:#6E6458;
+  --social:#8FA9F5; --good:#8FBF97; --chili:#E0785C; --gold:#D8A94E;
+}
+*{box-sizing:border-box}
+html{background:var(--ground)}
+body{
+  margin:0; min-height:100vh; background:var(--ground); color:var(--cream);
+  font-family:ui-rounded,-apple-system,BlinkMacSystemFont,"SF Pro","Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; padding:0 20px 80px;
+}
+.wrap{max-width:680px; margin:0 auto}
+
+/* ── masthead: the ranked-bars mark + kerned eyebrow, same as ordo-site ── */
+header{padding:44px 0 0}
+.mark{display:flex; flex-direction:column; gap:5px; margin-bottom:18px}
+.mark span{display:block; height:3px; border-radius:2px; background:var(--cream)}
+.mark span:nth-child(1){width:44px}.mark span:nth-child(2){width:32px}
+.mark span:nth-child(3){width:21px}.mark span:nth-child(4){width:11px}
+.eyebrow{font-size:11px; font-weight:700; letter-spacing:.18em; color:var(--ink2);
+  text-transform:uppercase; margin:0 0 8px}
+h1{font-size:34px; font-weight:800; letter-spacing:-.02em; margin:0 0 8px}
+.sub{margin:0; color:var(--ink2); line-height:1.55; font-size:15px}
+.rule{height:1px; background:var(--border); border:0; margin:22px 0 0}
+
+/* ── who bar ── */
+.whobar{display:flex; align-items:center; gap:12px; margin-top:14px;
+  font-size:13px; color:var(--ink2); flex-wrap:wrap}
+.whobar b{color:var(--cream); font-weight:700}
+.linklike{background:none; border:0; padding:0; color:var(--ink2); font:inherit;
+  text-decoration:underline; cursor:pointer}
+.linklike:hover{color:var(--cream)}
+
+/* ── sign-in card ── */
+.authcard{margin-top:36px; background:var(--card); border:1px solid var(--border);
+  border-radius:20px; padding:32px 28px; max-width:420px}
+.authcard h2{font-size:22px; font-weight:800; letter-spacing:-.01em; margin:0 0 8px}
+.authcard p{margin:0 0 18px; color:var(--ink2); font-size:14px; line-height:1.55}
+input[type=email]{
+  width:100%; padding:13px 16px; border-radius:999px; border:1px solid var(--border);
+  background:var(--ground); color:var(--cream); font:inherit; font-size:15px; outline:none;
+}
+input[type=email]:focus{border-color:var(--social)}
+.btn{
+  display:inline-block; font:inherit; font-weight:700; font-size:14px; cursor:pointer;
+  padding:11px 20px; border-radius:999px; border:1px solid var(--border);
+  background:var(--ground); color:var(--cream); transition:border-color .15s, transform .05s;
+}
+.btn:hover{border-color:var(--ink2)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.45; cursor:default; transform:none}
+.btn.primary{background:var(--cream); color:var(--ground); border-color:var(--cream)}
+.btn.primary:hover{border-color:var(--cream); opacity:.9}
+.authcard .btn{margin-top:12px; width:100%}
+.hint{font-size:13px; color:var(--ink3); margin-top:14px; line-height:1.5}
+
+/* ── tabs ── */
+.tabs{display:flex; gap:8px; margin:26px 0 18px; flex-wrap:wrap}
+.tab{
+  font:inherit; font-size:12px; font-weight:700; letter-spacing:.14em;
+  text-transform:uppercase; cursor:pointer; padding:9px 15px; border-radius:999px;
+  border:1px solid var(--border); background:transparent; color:var(--ink2);
+  transition:border-color .15s, color .15s;
+}
+.tab:hover{border-color:var(--ink2)}
+.tab.on{background:var(--cream); color:var(--ground); border-color:var(--cream)}
+.tab .n{font-weight:800; margin-left:6px}
+.tab.on .n{color:var(--ground)}
+
+/* ── submission cards ── */
+.sub-card{
+  background:var(--card); border:1px solid var(--border); border-radius:18px;
+  padding:22px 22px 18px; margin-bottom:14px;
+}
+.sub-top{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap}
+.sub-title{font-size:19px; font-weight:800; letter-spacing:-.01em; margin:0; flex:1 1 auto}
+.sub-meta{font-size:12px; color:var(--ink3); white-space:nowrap}
+.who{font-size:12px; color:var(--ink2); margin-top:3px}
+.who code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px;
+  background:var(--ground); border:1px solid var(--border); border-radius:6px; padding:1px 6px}
+.items{display:flex; flex-wrap:wrap; gap:7px; margin-top:14px}
+.item{
+  font-size:13px; color:var(--cream); background:var(--card2);
+  border:1px solid var(--border); border-radius:999px; padding:5px 12px;
+}
+.item .idx{color:var(--ink3); font-weight:700; font-size:11px; margin-right:5px}
+.note{
+  margin:14px 0 0; padding:10px 14px; border-left:2px solid var(--border);
+  color:var(--ink2); font-size:14px; line-height:1.5; font-style:italic;
+}
+.actions{display:flex; gap:8px; margin-top:16px; padding-top:14px;
+  border-top:1px solid var(--border); flex-wrap:wrap}
+.btn.approve{color:var(--good)}   .btn.approve:hover{border-color:var(--good)}
+.btn.reject{color:var(--chili)}   .btn.reject:hover{border-color:var(--chili)}
+.btn.flag{color:var(--gold)}      .btn.flag:hover{border-color:var(--gold)}
+.stamp{font-size:12px; color:var(--ink3); margin-left:auto; align-self:center}
+
+/* ── states ── */
+.empty{
+  text-align:center; color:var(--ink3); padding:56px 20px; font-size:15px;
+  border:1px dashed var(--border); border-radius:18px; margin-top:8px; line-height:1.6;
+}
+.banner{
+  margin-top:18px; padding:12px 16px; border-radius:12px; font-size:14px; line-height:1.5;
+  border:1px solid var(--chili); color:var(--chili); display:none;
+}
+.banner.ok{border-color:var(--good); color:var(--good)}
+.banner.show{display:block}
+.loading{color:var(--ink3); font-size:14px; padding:40px 0; text-align:center}
+footer{margin-top:48px; padding-top:18px; border-top:1px solid var(--border);
+  font-size:12px; color:var(--ink3); line-height:1.6}
+@media (max-width:480px){ h1{font-size:28px} .sub-card{padding:18px 16px 14px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <p class="eyebrow">Ordo · Topic queue</p>
+    <h1>The pitch pile</h1>
+    <p class="sub">World-topic ideas from the players. Approve the fights worth having.</p>
+    <div class="whobar" id="whobar" hidden>
+      Signed in as <b id="who-email"></b>
+      <button class="linklike" id="signout">Sign out</button>
+    </div>
+    <hr class="rule">
+  </header>
+
+  <div class="banner" id="banner"></div>
+
+  <!-- signed-out: email → magic link -->
+  <section class="authcard" id="auth" hidden>
+    <h2>Sign in</h2>
+    <p>Enter the admin email — a magic link lands in the inbox and bounces back here. No password, no session, no entry.</p>
+    <form id="auth-form">
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="email" required>
+      <button class="btn primary" id="send" type="submit">Send magic link</button>
+    </form>
+    <p class="hint" id="auth-hint">Only the admin account can see the queue — anyone else signs into an empty room.</p>
+  </section>
+
+  <!-- signed-in: the queue -->
+  <section id="queue" hidden>
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div id="list"><div class="loading">Loading the pile…</div></div>
+  </section>
+
+  <footer>
+    Submitter names show as short ids: the app's profile visibility is group-scoped,
+    and this admin account shares a group with no one — the join comes back empty by design.<br>
+    Ordo — the daily ranking game you play with your friends.
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+"use strict";
+
+// The PUBLIC anon client key (identical to the one shipped inside the iOS
+// app) — safe to embed; every privilege on this page comes from RLS + the
+// signed-in admin JWT, never from this key. See the header comment.
+const SUPABASE_URL = "https://lhgrjflugaipqloofkfn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxoZ3JqZmx1Z2FpcHFsb29ma2ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NjIwOTYsImV4cCI6MjA5OTAzODA5Nn0.4ZxMkCVGbi9DFZqeUHUC8ABTasfjbmtkC6CFM7srwiY";
+const ADMIN_EMAIL = "bnlee419@gmail.com";  // must match the 0041 RLS policies
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const STATUSES = ["pending", "approved", "rejected", "flagged"];
+let rows = [];            // every visible submission (admin RLS = all of them)
+let tab = "pending";
+let profilesJoinWorks = true;
+
+const $ = (id) => document.getElementById(id);
+
+// Player-authored strings (title/items/note) land in admin-session DOM —
+// escape EVERYTHING; a spicy pitch must never become script.
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g,
+    (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+function banner(msg, ok = false) {
+  const el = $("banner");
+  el.textContent = msg;
+  el.className = "banner show" + (ok ? " ok" : "");
+  if (ok) setTimeout(() => el.classList.remove("show"), 4000);
+}
+
+function relTime(iso) {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return mins + "m ago";
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return hrs + "h ago";
+  const days = Math.round(hrs / 24);
+  if (days < 14) return days + "d ago";
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function submitterLabel(r) {
+  const name = r.submitter && r.submitter.username;
+  if (name) return "@" + esc(name);
+  // profiles RLS is group-scoped → the join is null for this admin user;
+  // a short id-hash is still enough to recognise a repeat submitter.
+  return '<code>' + esc(String(r.submitter_id).slice(0, 8)) + "</code>";
+}
+
+// ───────────────────────── auth ─────────────────────────
+
+async function sendMagicLink(e) {
+  e.preventDefault();
+  const email = $("email").value.trim();
+  if (!email) return;
+  $("send").disabled = true;
+  // Redirect straight back to this exact page — it must be listed in
+  // Auth → URL Configuration → Redirect URLs (see header comment).
+  const { error } = await db.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin + window.location.pathname },
+  });
+  $("send").disabled = false;
+  if (error) { banner("Couldn't send the link: " + error.message); return; }
+  $("auth-hint").textContent = "Sent — check the inbox and tap the link on this device.";
+  banner("Magic link sent to " + email + ".", true);
+}
+
+async function signOut() {
+  await db.auth.signOut();
+  render(null);
+}
+
+// ───────────────────────── data ─────────────────────────
+
+async function loadRows() {
+  $("list").innerHTML = '<div class="loading">Loading the pile…</div>';
+  // Try the username join first (submitter_id → profiles). Group-scoped
+  // profiles RLS usually nulls it out; if PostgREST rejects the embed
+  // outright, fall back to the bare table.
+  let res = await db.from("topic_submissions")
+    .select("*, submitter:profiles(username)")
+    .order("created_at", { ascending: false });
+  if (res.error) {
+    profilesJoinWorks = false;
+    res = await db.from("topic_submissions")
+      .select("*")
+      .order("created_at", { ascending: false });
+  }
+  if (res.error) {
+    banner("Couldn't load the queue: " + res.error.message);
+    $("list").innerHTML = "";
+    return;
+  }
+  rows = res.data || [];
+  renderQueue();
+}
+
+async function setStatus(id, status, btn) {
+  const card = btn.closest(".sub-card");
+  card.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  const { error } = await db.from("topic_submissions")
+    .update({ status, reviewed_at: status === "pending" ? null : new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    banner("Couldn't update: " + error.message);
+    card.querySelectorAll("button").forEach((b) => (b.disabled = false));
+    return;
+  }
+  const row = rows.find((r) => r.id === id);
+  if (row) { row.status = status; row.reviewed_at = status === "pending" ? null : new Date().toISOString(); }
+  renderQueue();
+}
+
+// ───────────────────────── rendering ─────────────────────────
+
+function renderTabs() {
+  $("tabs").innerHTML = STATUSES.map((s) => {
+    const n = rows.filter((r) => r.status === s).length;
+    return `<button class="tab${s === tab ? " on" : ""}" role="tab"
+      aria-selected="${s === tab}" data-tab="${s}">${s}<span class="n">${n}</span></button>`;
+  }).join("");
+  $("tabs").querySelectorAll(".tab").forEach((b) =>
+    b.addEventListener("click", () => { tab = b.dataset.tab; renderQueue(); }));
+}
+
+function actionButtons(r) {
+  const acts = [];
+  if (r.status !== "approved") acts.push(["approved", "Approve", "approve"]);
+  if (r.status !== "rejected") acts.push(["rejected", "Reject", "reject"]);
+  if (r.status !== "flagged")  acts.push(["flagged", "Flag", "flag"]);
+  if (r.status !== "pending")  acts.push(["pending", "Back to pending", ""]);
+  return acts.map(([s, label, cls]) =>
+    `<button class="btn ${cls}" data-act="${s}" data-id="${esc(r.id)}">${label}</button>`).join("");
+}
+
+function cardHTML(r) {
+  const items = (r.items || []).map((it, i) =>
+    `<span class="item"><span class="idx">${String(i + 1).padStart(2, "0")}</span>${esc(it)}</span>`).join("");
+  const stamp = r.reviewed_at
+    ? `<span class="stamp">ruled ${relTime(r.reviewed_at)}</span>`
+    : `<span class="stamp"></span>`;
+  return `<article class="sub-card">
+    <div class="sub-top">
+      <h3 class="sub-title">${esc(r.title)}</h3>
+      <span class="sub-meta">${relTime(r.created_at)}</span>
+    </div>
+    <div class="who">from ${submitterLabel(r)}</div>
+    ${items ? `<div class="items">${items}</div>` : ""}
+    ${r.note ? `<blockquote class="note">${esc(r.note)}</blockquote>` : ""}
+    <div class="actions">${actionButtons(r)}${stamp}</div>
+  </article>`;
+}
+
+function renderQueue() {
+  renderTabs();
+  const visible = rows.filter((r) => r.status === tab);
+  if (!visible.length) {
+    const emptyCopy = rows.length === 0
+      ? "Nothing here. Either no one has pitched yet — or this isn't the admin account, in which case the queue stays invisible by design."
+      : `No ${tab} pitches.`;
+    $("list").innerHTML = `<div class="empty">${emptyCopy}</div>`;
+    return;
+  }
+  $("list").innerHTML = visible.map(cardHTML).join("");
+  $("list").querySelectorAll("button[data-act]").forEach((b) =>
+    b.addEventListener("click", () => setStatus(b.dataset.id, b.dataset.act, b)));
+}
+
+let renderedUserId = null;   // skip re-renders for token refreshes / echoes
+
+function render(session) {
+  const uid = session ? session.user.id : null;
+  if (uid !== null && uid === renderedUserId) return;
+  renderedUserId = uid;
+  const signedIn = !!session;
+  $("auth").hidden = signedIn;
+  $("queue").hidden = !signedIn;
+  $("whobar").hidden = !signedIn;
+  if (signedIn) {
+    $("who-email").textContent = session.user.email || "(no email)";
+    if ((session.user.email || "").toLowerCase() !== ADMIN_EMAIL) {
+      banner("Heads up: this isn't the admin email — the queue will be empty and read-only.");
+    }
+    loadRows();
+  } else {
+    rows = [];
+  }
+}
+
+// ───────────────────────── boot ─────────────────────────
+
+$("auth-form").addEventListener("submit", sendMagicLink);
+$("signout").addEventListener("click", signOut);
+
+// detectSessionInUrl (on by default) swallows the magic-link hash and mints
+// the session; onAuthStateChange then flips the page into queue mode.
+db.auth.onAuthStateChange((_event, session) => render(session));
+db.auth.getSession().then(({ data }) => render(data.session));
+</script>
+</body>
+</html>
