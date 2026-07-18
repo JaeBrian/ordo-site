@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "6HFHHC7855.com.jaebrian.ordo"
+        ],
+        "components": [
+          { "/": "/join" },
+          { "/": "/join/" },
+          { "/": "/join/*" }
+        ]
+      }
+    ]
+  }
+}
